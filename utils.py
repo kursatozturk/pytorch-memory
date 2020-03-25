@@ -211,7 +211,7 @@ class Feeder:
         self.input_list = input_list
         self.output_list = output_list
         self.configs = configs
-        self.read_batch_count = configs.total_sample_count // configs.allowed_sample_count 
+        self.read_batch_count = configs.one_read_count * configs.total_sample_count // configs.allowed_sample_count 
         self.input_output_list_length = configs.allowed_sample_count // configs.one_read_count
  
     def _get_samples_one_pass(self) -> Iterable[np.ndarray]:
@@ -242,64 +242,6 @@ class Feeder:
     def generate_epochs(self, epoch_count:int = 1) -> Iterable[Iterable[np.ndarray]]:
         samples_generator = self._get_samples_one_pass()
         if epoch_count == 1:
-            return samples_generator
-        yield from itertools.tee(samples_generator, epoch_count)
-
-    @staticmethod
-    def train_batch_generator(
-            configs: Config, 
-            input_list: List[str], 
-            output_list: List[str],
-            read_input: Callable[[str], Iterable[np.ndarray]],
-            get_output: Callable[[str], Iterable[np.ndarray]],
-            apply_on_input_batch: Callable[[Iterable[np.ndarray]], np.ndarray] = None,
-            apply_on_output_batch: Callable[[Iterable[np.ndarray]], np.ndarray] = None,
-            ) -> Iterable[np.ndarray]:
-        """
-            Reads files from hard drive and returns,
-            by not violating the memory restrictions
-            batch by batch.
-            i.e. if memory limit is 1gb, 
-            calculates memory_footprint = 1gb - sample_batch_memory_footprint(batch_size)
-            Returns a generator that reads 'memory_footprint bytes' of music in each pass.
-            
-            @param config: Config instance for resource limitations and requirements,
-            @param input_list: List of input paths that to be read from disk,
-            @param output_list: List of output paths that to be read from disk,
-            @param read_input: A Callable taking one parameter of input path. Should return an iterator containin np.ndarray items,
-            @param get_output: A Callable taking one parameter of output path. Should return an iterator containin np.ndarray items,
-            @param apply_on_input_batch: A Callable taking one parameter of input batch. Should return a np.ndarray,
-            @param apply_on_output_batch: A Callable taking one parameter of output batch. Should return a np.ndarray,
-        """
-        if apply_on_input_batch is None:
-            apply_on_input_batch = lambda x: np.array(list(x), dtype=configs.input_dtype)
-        if apply_on_output_batch is None:
-            apply_on_output_batch = lambda x: np.array(list(x), dtype=configs.output_dtype)
-        #sample_count = min(one_read_count * len(input_list), configs.allowed_sample_count)
-
-        read_batch_count = configs.total_sample_count // configs.allowed_sample_count 
-        input_output_list_length = configs.allowed_sample_count // configs.one_read_count
-        start_from = 0
-        read_until = input_output_list_length
-        for _ in range(read_batch_count):
-            samples_on_memory = (
-                    inp for inp_path in input_list[
-                        start_from: read_until
-                        ]
-                    for inp in read_input(inp_path)
-                    )
-            labels_on_memory = (
-                    out for out_path in output_list[
-                        start_from: read_until
-                        ]
-                    for out in get_output(out_path)
-                    )
-            for batch in range(configs.batch_count):
-                yield apply_on_input_batch(
-                        (sample for sample in itertools.islice(samples_on_memory, configs.batch_size))
-                        ), apply_on_output_batch(
-                        (label for label in itertools.islice(labels_on_memory, configs.batch_size))
-                        )
-            start_from += input_output_list_length
-            read_until += input_output_list_length
-
+            yield samples_generator
+        else:
+            yield from itertools.tee(samples_generator, epoch_count)
