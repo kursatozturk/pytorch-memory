@@ -7,7 +7,9 @@ I tried to solve this memory issues.
 There exists three utility classes.
 
 ### InspectNetwork
-	calculates the estimated memory usage for the given network.
+calculates the estimated memory usage for the given network.
+
+
 ##### note: It assumes the network should use the forward method as this  
 ```
     def forward(self, batch: torch.Tensor) -> torch.Tensor:
@@ -17,10 +19,11 @@ There exists three utility classes.
 ```
 
 #### Usage:
+```
 inspector = InspectNetwork(network, input_shape)
 parameter_count = inspector.get_parameter_count()
 intermediate_variable_count = inspector.get+intermediate_variable_count()
-
+```
 Note that this only returns variable count. To find the memory usage, you should mutliply it with the element size. (i.e. 2 for half, 4 for float)
 
 ### Config
@@ -32,6 +35,7 @@ It calculates:
 It is required for the Feeder class.
 
 #### Usage: 
+```
 config = Config(
 	cpu_memory_limit=GiB(2),
 	gpu_memory_limit=GiB(1.5),
@@ -44,6 +48,8 @@ config = Config(
 	one_read_count=2,
 	preferred_batch_size=16
 )
+```
+
 most of the parameters are self-explanatary.
 one_read_count is a bit tricky here. In Feeder class, inputs are read by a registered hook, input_read. Sometimes, training can require to use a single sample multiple times with small variations like adding noise or shifting etc. Here you can read the sample, add some variance to it and yield both of them. Config need to know exact count to be able to calculate correct estimations.
 preferred_batch_size is also self-explanatary however preferred means that it is not a must. If memory is not available or if it is not a multiple of one_read_count, it will be recalculated.
