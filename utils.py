@@ -9,7 +9,6 @@ from torch import nn
 import torch
 import time
 import json
-from models import MusicalSoundSegmentation
 from scipy.io import wavfile
 
 
@@ -120,7 +119,6 @@ class Config:
     def __init__(self, 
             cpu_memory_limit: int, # in bytes
             gpu_memory_limit: int, # in bytes
-            total_sample_count: int,
             input_shape: Tuple,
             output_shape: Tuple,
             model_class: type,
@@ -143,7 +141,7 @@ class Config:
         """
         self.cpu_memory_limit = cpu_memory_limit # bytes.
         self.gpu_memory_limit = gpu_memory_limit # bytes.
-        self._total_sample_count = total_sample_count
+        self._total_sample_count = len(input_shape)
         self.input_shape = input_shape
         self.output_shape = output_shape
         self.input_dtype = input_dtype
@@ -203,11 +201,11 @@ class Config:
 
     @property
     def _allowed_sample_count(self):
-        return min(self.total_sample_count, self.cpu_memory_limit // self.sample_size)
+        return min(self.total_sample_count, self.cpu_memory_limit // (self.sample_size * self.one_read_count))
 
     @property
     def allowed_sample_count(self):
-        return round_to(self._allowed_sample_count, self.sample_count_in_single_batch) // self.one_read_count
+        return round_to(self._allowed_sample_count, self.sample_count_in_single_batch) 
 
     @property
     def batch_count(self):
@@ -263,7 +261,8 @@ class Feeder:
 
     def _get_samples_one_pass(self) -> Iterable[np.ndarray]:
         start_from = 0
-        read_until = self.configs.allowed_sample_count
+        step = self.configs.sample_count_in_single_batch * self.configs.batch_count
+        read_until = step
         for i in range(self.configs.total_read_count):
             samples_on_memory = (
                     inp for inp_path in self.input_list[
@@ -283,14 +282,13 @@ class Feeder:
                         ), self.apply_on_output_batch(
                         (label for label in itertools.islice(labels_on_memory, self.configs.batch_size))
                         )
-            start_from += self.configs.allowed_sample_count
-            read_until += self.configs.allowed_sample_count
+            start_from += step
+            read_until += step
 
     def generate_epochs(self, epoch_count:int = 1) -> Iterable[Iterable[np.ndarray]]:
         samples_generator = self._get_samples_one_pass()
         if epoch_count == 1:
             yield samples_generator
-            samples_generator
         else:
             yield from itertools.tee(samples_generator, epoch_count)
 
