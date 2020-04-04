@@ -23,11 +23,11 @@ def test():
     
     def read_input(path):
         _, sample = wavfile.read(f'{main_path}/audio/{path}.wav')
-        yield from np.split(sample, 4, axis=0)
+        yield from np.split(sample, 200, axis=0)
 
     def get_output(path):
         label = raw_labels.get(path)
-        frequencies = np.zeros((200,))
+        frequencies = np.zeros((127,))
         midi_number = int(label.get('pitch'))
         freq = 2 ** (midi_number / 12)
         frequencies[:] = freq
@@ -59,24 +59,15 @@ def test():
     config = Config(
             cpu_memory_limit=MiB(64),
             gpu_memory_limit=GiB(4),
-            input_shape=(1, 1, 4000),
-            output_shape=(1, 200),
+            total_sample_count=len(labels),
+            input_shape=(1, 1, 320),
+            output_shape=(1, 127),
             model_class=MusicalSoundSegmentation,
             input_dtype=np.float32,
             output_dtype=np.float32,
-            one_read_count=4
+            one_read_count=200,
+            preferred_batch_size=200
             )
-
-    epoch_generator = generate_epoch(
-            configs=config,
-            input_list=labels,
-            output_list=labels,
-            read_input=read_input,
-            get_output=get_output,
-            )
-    time.sleep(3)
-    epochs = multiply_epochs(epoch_generator=epoch_generator, epoch_count=1000)
-    func_t, func_sample_count, func_batch_count, func_epoch_count = evaluate_epoch_time(epochs)
     feeder = Feeder(
             configs=config,
             input_list=labels,
@@ -88,7 +79,15 @@ def test():
             )
     epochs = feeder.generate_epochs(epoch_count=1000)
     cls_t, cls_sample_count, cls_batch_count, cls_epoch_count = evaluate_epoch_time(epochs) 
-    return
+    epoch_generator = generate_epoch(
+            configs=config,
+            input_list=labels,
+            output_list=labels,
+            read_input=read_input,
+            get_output=get_output,
+            )
+    epochs = multiply_epochs(epoch_generator=epoch_generator, epoch_count=1000)
+    func_t, func_sample_count, func_batch_count, func_epoch_count = evaluate_epoch_time(epochs)
     print('tests done for the following network')
     model_summary = summary_of_network(MusicalSoundSegmentation, config.input_shape)
     for layer in model_summary:

@@ -87,3 +87,18 @@ for epoch in epochs:
 It basically utilizes the generators. This way, it creates pseudo-threaded implementation and decreases memory usage dramatically since all the operations are handled on the go. With the help of caching, it may even makes use of faster reading after first epoch finished. However it highly depends on data size and the os/build. 
 
 Note: After diving into memory usage further I discovered that script uses very high amount of memory, way higher than given limit. It is due to the python's memory management system however I cannot decrease it further with current implementatios. Still limits makes sense, so use it with caution that it will use a bit higher than given.
+
+
+# Other Functions
+## get_variable_count
+Calculates the intermediate variable count for given torch.nn.Module and input shape.
+
+## get_parameter_count
+Calculates the parameter variable count for given torch.nn.Module.
+
+## summary_of_network
+returns a list of dictionary representing the layers of network. Specifies
+* input_shape,
+* output_shape,
+* parameter_count,
+* layer_type_name
